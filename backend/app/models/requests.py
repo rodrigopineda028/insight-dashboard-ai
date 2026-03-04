@@ -16,3 +16,9 @@ class ChartDataRequest(BaseModel):
     x_axis: str
     y_axis: str | None = None
     aggregation: Literal["sum", "count", "avg", "none"] = "none"
+
+
+class QueryRequest(BaseModel):
+    """Request model for natural language query."""
+    file_id: str
+    query: str

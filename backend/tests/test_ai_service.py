@@ -52,3 +52,19 @@ class TestAIService:
                 await service.analyze_dataset(sample_metadata)
             
             assert '1 visualizaciones' in str(exc_info.value) or 'expected' in str(exc_info.value).lower()
+    
+    @pytest.mark.asyncio
+    async def test_analyze_dataset_rejects_scatter_with_date(self, sample_metadata):
+        """Test that scatter chart with date column is rejected."""
+        service = AIService()
+        
+        # Mock Claude API response with 3 valid charts + 1 invalid scatter with date
+        mock_response = Mock()
+        mock_response.content = [Mock(text='[{"title": "Test1", "chart_type": "bar", "parameters": {"x_axis": "Product", "y_axis": "Sales", "aggregation": "sum"}, "insight": "Test"}, {"title": "Test2", "chart_type": "line", "parameters": {"x_axis": "Date", "y_axis": "Sales", "aggregation": "sum"}, "insight": "Test"}, {"title": "Test3", "chart_type": "scatter", "parameters": {"x_axis": "Date", "y_axis": "Sales", "aggregation": "none"}, "insight": "Test"}]')]
+        
+        with patch.object(service.client.messages, 'create', return_value=mock_response):
+            with pytest.raises(Exception) as exc_info:
+                await service.analyze_dataset(sample_metadata)
+            
+            error_msg = str(exc_info.value).lower()
+            assert 'temporal' in error_msg or 'scatter' in error_msg or 'fecha' in error_msg

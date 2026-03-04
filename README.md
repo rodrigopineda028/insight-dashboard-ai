@@ -243,11 +243,14 @@ El prompt enviado a Claude incluye:
    - **No inventar columnas**: solo usar las del dataset
    - **Tipos de gráfico permitidos**: `bar`, `line`, `pie`, `scatter`
    - **Validación por tipo**:
-     - **Line**: requiere columna temporal o secuencial
+     - **Line**: SOLO para columnas de fecha/tiempo en x_axis. Perfecto para tendencias temporales
+     - **Scatter**: SOLO para 2 columnas NUMÉRICAS (NO fechas). Para correlaciones como Sales vs Quantity
      - **Pie**: solo para categóricas con <10 valores únicos
      - **Bar**: eje X categórico/temporal, eje Y numérico
-     - **Scatter**: ambos ejes numéricos
+   - **Regla crítica**: Si hay fecha/tiempo + valor numérico → SIEMPRE usar line chart (NUNCA scatter)
    - **Agregaciones válidas**: `sum`, `count`, `avg`, `none`
+   - **Validación de columnas temporales**: El sistema detecta automáticamente columnas con tipo "date"/"time" y rechaza sugerencias de scatter que las incluyan
+   - **Auto-corrección en queries NL**: Si un usuario pide scatter con fechas, se auto-convierte a line chart
 
 4. **Formato de respuesta**:
    - JSON array **sin texto adicional** (crítico para parsing)
@@ -292,8 +295,83 @@ temperature=0.3  # Baja para JSON determinístico
 
 - **Temperature 0.3**: Balance entre creatividad y consistencia JSON
 - **Regex fallback**: Extrae JSON si Claude lo envuelve en markdown
-- **Validación doble**: Schema Pydantic + verificación de columnas
+- **Validación doble**: Schema Pydantic + verificación de columnas + detección de tipos temporales
 - **Retry inteligente**: Refuerza instrucciones JSON en reintentos
+- **Prevención de scatter+fechas**: Validación estricta rechaza sugerencias de scatter con columnas temporales (date/time)
+- **Auto-corrección en queries**: Si el usuario pide scatter con fechas en lenguaje natural, se auto-convierte a line chart
+
+## 🧪 Testing
+
+### Backend (pytest)
+
+```bash
+cd backend
+python -m pytest                    # Ejecutar todos los tests
+python -m pytest --cov=app          # Con cobertura de código
+python -m pytest -v                 # Modo verbose
+```
+
+### Frontend (vitest)
+
+```bash
+cd frontend
+npm test                    # Ejecutar tests una vez
+npm run test:watch          # Modo watch
+npm run test:ui             # UI interactiva
+npm run test:coverage       # Con cobertura
+```
+
+## 🚀 Roadmap de Mejoras
+
+### Alta Prioridad
+
+- **🤖 LLM Agnóstico**:
+  - Abstraer capa de IA para soportar múltiples proveedores
+  - Permitir selección entre Claude, GPT-4, Gemini, Llama
+  - Fallback automático si un LLM falla
+
+- **🎯 Cobertura de Tests 80%+**:
+  - Expandir tests backend para cubrir edge cases
+  - Agregar tests e2e con Playwright/Cypress
+  - Tests de integración para flujo completo (upload → análisis → visualización)
+  - Tests de rendimiento para datasets grandes
+
+- **🚢 Pipeline de CI/CD**:
+  - GitHub Actions para tests automáticos en cada PR
+  - Deploy automático a staging/producción
+  - Linting y formateo automático (Black, ESLint, Prettier)
+  - Build y push de imágenes Docker a registry
+  - Health checks y rollback automático
+
+### Media Prioridad
+
+- **💾 Persistencia de Datos**:
+  - Migrar de in-memory a Redis/PostgreSQL
+  - Guardar historial de análisis por usuario
+  - Caché de resultados de IA para queries similares
+
+- **📊 Más Tipos de Visualización**:
+  - Heatmaps para correlaciones
+  - Box plots para distribuciones
+  - Histogramas para frecuencias
+  - Time series avanzados con múltiples series
+
+- **🔍 Query Natural Language Mejorado**:
+  - Conversaciones multi-turno con contexto
+  - Sugerencias de queries basadas en el dataset
+  - Explicaciones más detalladas de insights
+
+### Baja Prioridad
+
+- **🎨 Customización de Gráficos**:
+  - Selección de colores personalizados
+  - Ajuste de escalas y ejes
+  - Export a formatos adicionales (SVG, JSON)
+
+- **⚡ Optimización de Rendimiento**:
+  - Paginación para datasets muy grandes (>100k filas)
+  - Lazy loading de gráficos
+  - Compresión de respuestas API
 
 ## 🔑 Variables de Entorno
 

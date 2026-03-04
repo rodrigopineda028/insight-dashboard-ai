@@ -13,20 +13,48 @@ class ChartService:
     def aggregate_data(df: pd.DataFrame, x_col: str, y_col: str | None, agg_type: str) -> List[Dict[str, Any]]:
         """Aggregate data based on chart parameters."""
         
+        # Check if x_col is a date column and should be grouped by month
+        df_copy = df.copy()
+        is_date_column = False
+        
+        try:
+            # Try to convert to datetime
+            df_copy[x_col] = pd.to_datetime(df_copy[x_col])
+            is_date_column = True
+            
+            # If it's a date and has more than 15 unique values (likely daily data)
+            # group by month for better visualization
+            unique_dates = df_copy[x_col].nunique()
+            if unique_dates > 15:
+                # Create a month column (e.g., "2024-01" format)
+                df_copy['_month'] = df_copy[x_col].dt.to_period('M').astype(str)
+                x_col_to_use = '_month'
+            else:
+                # Keep as dates but format nicely
+                df_copy[x_col] = df_copy[x_col].dt.strftime('%Y-%m-%d')
+                x_col_to_use = x_col
+        except (ValueError, TypeError):
+            # Not a date column, use as is
+            x_col_to_use = x_col
+        
         if agg_type == "count":
             # Count occurrences of each category
-            result = df[x_col].value_counts().reset_index()
+            result = df_copy[x_col_to_use].value_counts().reset_index()
             result.columns = [x_col, "count"]
             return result.to_dict(orient="records")
         
         elif agg_type == "none" and y_col:
             # No aggregation, return as is (for scatter or line charts with direct values)
-            result = df[[x_col, y_col]].dropna()
+            if is_date_column and x_col_to_use == x_col:
+                # For dates without grouping, keep formatted dates
+                result = df_copy[[x_col, y_col]].dropna()
+            else:
+                result = df[[x_col, y_col]].dropna()
             return result.to_dict(orient="records")
         
         elif agg_type in ["sum", "avg"] and y_col:
             # Group by x_col and aggregate y_col
-            grouped = df.groupby(x_col)[y_col]
+            grouped = df_copy.groupby(x_col_to_use)[y_col]
             
             if agg_type == "sum":
                 result = grouped.sum().reset_index()
@@ -38,7 +66,7 @@ class ChartService:
         
         else:
             # Default: just return unique values
-            result = df[x_col].value_counts().reset_index()
+            result = df_copy[x_col_to_use].value_counts().reset_index()
             result.columns = [x_col, "value"]
             return result.to_dict(orient="records")
     
@@ -73,9 +101,13 @@ class ChartService:
             try:
                 # Try to sort as datetime if possible
                 df_temp = pd.DataFrame(data)
-                df_temp[x_col] = pd.to_datetime(df_temp[x_col], errors='ignore')
+                # Try to convert to datetime, keep original if it fails
+                try:
+                    df_temp[x_col] = pd.to_datetime(df_temp[x_col])
+                except (ValueError, TypeError):
+                    pass  # Keep original values if conversion fails
                 data = df_temp.sort_values(x_col).to_dict(orient="records")
-            except:
+            except Exception:
                 # If not datetime, sort as is
                 data = sorted(data, key=lambda x: x[x_col])
         
@@ -83,10 +115,19 @@ class ChartService:
     
     @staticmethod
     def process_scatter_chart(df: pd.DataFrame, x_col: str, y_col: str) -> List[Dict[str, Any]]:
-        """Process data for scatter chart."""
-        # For scatter, we want individual points, no aggregation
+        """Process data for scatter chart (numeric correlation only)."""
+        # Scatter charts require numeric values on both axes
+        df_copy = df[[x_col, y_col]].copy().dropna()
+        
+        # Ensure both columns are numeric (coerce non-numeric to NaN)
+        df_copy[x_col] = pd.to_numeric(df_copy[x_col], errors='coerce')
+        df_copy[y_col] = pd.to_numeric(df_copy[y_col], errors='coerce')
+        
+        # Drop rows where conversion to numeric failed
+        df_copy = df_copy.dropna()
+        
         # Limit to max points for performance
-        result = df[[x_col, y_col]].dropna().head(settings.SCATTER_MAX_POINTS)
+        result = df_copy.head(settings.SCATTER_MAX_POINTS)
         return result.to_dict(orient="records")
     
     def get_chart_data(

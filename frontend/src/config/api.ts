@@ -9,6 +9,7 @@ export const API_CONFIG = {
     upload: '/api/upload',
     analyze: '/api/analyze',
     chartData: '/api/chart-data',
+    query: '/api/query',
   },
 } as const;
 

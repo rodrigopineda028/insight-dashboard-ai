@@ -64,22 +64,6 @@ class TestChartService:
         assert len(result) == 5  # All rows should be included
         assert all('Sales' in row and 'Quantity' in row for row in result)
     
-    # def test_process_scatter_chart_with_date(self):
-    #     """Test scatter chart with date column converts to year."""
-    #     df = pd.DataFrame({
-    #         'Date': ['1987-06-30', '1988-05-31', '1989-04-28'],
-    #         'Price': [18.53, 15.97, 19.64]
-    #     })
-        
-    #     service = ChartService()
-    #     result = service.process_scatter_chart(df=df, x_col='Date', y_col='Price')
-        
-    #     assert len(result) == 3
-    #     # Dates should be converted to years (as integers)
-    #     assert result[0]['Date'] == 1987
-    #     assert result[1]['Date'] == 1988
-    #     assert result[2]['Date'] == 1989
-    
     def test_get_chart_data_bar(self, sample_dataframe):
         """Test complete chart data generation for bar chart."""
         service = ChartService()

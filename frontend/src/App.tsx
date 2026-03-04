@@ -3,11 +3,12 @@ import { FileUpload } from "@/components/FileUpload"
 import { AnalysisLoader } from "@/components/AnalysisLoader"
 import { AnalysisCard } from "@/components/AnalysisCard"
 import { DashboardGrid } from "@/components/DashboardGrid"
+import { ChatQuery } from "@/components/ChatQuery"
 import { Header } from "@/components/Header"
 import { ArrowDown, LayoutDashboard, Lightbulb, RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import type { UploadResponse, AnalyzeResponse, UISuggestion } from "@/types"
+import type { UploadResponse, AnalyzeResponse, UISuggestion, ChartSuggestion } from "@/types"
 import { API_CONFIG, getApiUrl } from "@/config/api"
 
 type AppState = "upload" | "analyzing" | "results"
@@ -94,6 +95,27 @@ export default function App() {
   const handleUploadError = useCallback((errorMsg: string) => {
     setError(errorMsg)
   }, [])
+
+  const handleNewChart = useCallback((suggestion: ChartSuggestion) => {
+    // Convert to UI format and add to suggestions
+    const newSuggestion: UISuggestion = {
+      id: `chart-${suggestions.length + 1}`,
+      title: suggestion.title,
+      description: suggestion.title,
+      chartType: suggestion.chart_type,
+      insight: suggestion.insight,
+      columns: [suggestion.parameters.x_axis, suggestion.parameters.y_axis].filter((c): c is string => !!c),
+      parameters: suggestion.parameters
+    }
+    
+    setSuggestions((prev) => [...prev, newSuggestion])
+    setDashboardItems((prev) => [...prev, newSuggestion.id])
+    
+    // Scroll to dashboard
+    setTimeout(() => {
+      dashboardRef.current?.scrollIntoView({ behavior: "smooth" })
+    }, 100)
+  }, [suggestions.length])
 
   const activeSuggestions = suggestions.filter((s) => dashboardItems.includes(s.id))
 
@@ -203,6 +225,9 @@ export default function App() {
                 />
               ))}
             </div>
+
+            {/* Natural Language Query */}
+            <ChatQuery fileId={fileId} onNewChart={handleNewChart} />
 
             {/* Scroll indicator when dashboard has items */}
             {dashboardItems.length > 0 && (

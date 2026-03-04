@@ -71,3 +71,10 @@ class ChartDataResponse(BaseModel):
     y_axis: str | None
     data: List[Dict[str, Any]]
     total_points: int
+
+
+class QueryResponse(BaseModel):
+    """Response model for natural language query."""
+    file_id: str
+    query: str
+    suggestion: ChartSuggestion
