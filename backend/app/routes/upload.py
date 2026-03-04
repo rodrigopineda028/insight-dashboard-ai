@@ -36,15 +36,20 @@ def validate_file(file: UploadFile) -> None:
 def process_dataframe(df: pd.DataFrame) -> dict:
     """Extract metadata and statistics from DataFrame."""
     columns_info = []
+    total = len(df)
+    
     for col in df.columns:
         dtype = str(df[col].dtype)
         non_null = int(df[col].count())
+        null_count = total - non_null
         
         col_info = {
             "name": col,
             "type": dtype,
             "non_null_count": non_null,
-            "null_count": int(len(df) - non_null),
+            "null_count": null_count,
+            "missingness_pct": round((null_count / total * 100), 2) if total > 0 else 0,
+            "cardinality": int(df[col].nunique()),
         }
         
         # Add statistics for numeric columns
@@ -62,7 +67,7 @@ def process_dataframe(df: pd.DataFrame) -> dict:
         "row_count": len(df),
         "column_count": len(df.columns),
         "columns": columns_info,
-        "sample_data": df.head(5).to_dict(orient="records"),
+        "sample_data": df.head(10).to_dict(orient="records"),
     }
 
 

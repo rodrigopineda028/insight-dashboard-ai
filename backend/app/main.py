@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routes import upload
+from app.routes import analyze, upload
 
 app = FastAPI(title="Insight Dash AI")
 
@@ -21,6 +21,7 @@ app.add_middleware(
 )
 
 app.include_router(upload.router, prefix="/api", tags=["upload"])
+app.include_router(analyze.router, prefix="/api", tags=["analyze"])
 
 
 @app.get("/health")

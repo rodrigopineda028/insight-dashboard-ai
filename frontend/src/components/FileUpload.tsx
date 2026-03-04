@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react'
 import { useDropzone } from 'react-dropzone'
+import AnalysisSuggestions from './AnalysisSuggestions'
 
 type FileMetadata = {
   row_count: number
@@ -26,12 +27,17 @@ type UploadResponse = {
   metadata: FileMetadata
 }
 
-const apiUrl = import.meta.env.VITE_API_URL
+const apiUrl = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
 
 export default function FileUpload() {
   const [uploading, setUploading] = useState(false)
   const [fileData, setFileData] = useState<UploadResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [selectedCharts, setSelectedCharts] = useState<any[]>([])
+
+  const handleAddChart = (suggestion: any) => {
+    setSelectedCharts((prev) => [...prev, suggestion])
+  }
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     const file = acceptedFiles[0]
@@ -229,6 +235,29 @@ export default function FileUpload() {
                 </table>
               </div>
             </div>
+
+            <AnalysisSuggestions fileId={fileData.id} onAddChart={handleAddChart} />
+
+            {selectedCharts.length > 0 && (
+              <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
+                <h3 className="mb-3 font-semibold text-slate-100">
+                  Gráficos seleccionados ({selectedCharts.length})
+                </h3>
+                <div className="space-y-2">
+                  {selectedCharts.map((chart, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center justify-between rounded-lg bg-slate-950/60 p-3 text-sm"
+                    >
+                      <span className="text-slate-200">{chart.title}</span>
+                      <span className="rounded bg-indigo-500/20 px-2 py-1 text-xs text-indigo-300">
+                        {chart.chart_type}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
