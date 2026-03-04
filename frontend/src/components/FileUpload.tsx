@@ -1,269 +1,204 @@
-import { useCallback, useState } from 'react'
-import { useDropzone } from 'react-dropzone'
-import AnalysisSuggestions from './AnalysisSuggestions'
-import { Dashboard } from './Dashboard'
-import { ErrorMessage } from './ui/FeedbackComponents'
+import { useCallback, useState } from "react"
+import { Upload, FileSpreadsheet, X } from "lucide-react"
+import { cn } from "@/lib/utils"
+import { API_CONFIG, getApiUrl } from "@/config/api"
+import type { UploadResponse } from "@/types"
 
-type FileMetadata = {
-  row_count: number
-  column_count: number
-  columns: Array<{
-    name: string
-    type: string
-    non_null_count: number
-    null_count: number
-    stats?: {
-      min: number
-      max: number
-      mean: number
-      median: number
-    }
-  }>
-  sample_data: Record<string, unknown>[]
+interface FileUploadProps {
+  onFileUploaded: (response: UploadResponse) => void
+  onError: (error: string) => void
 }
 
-type UploadResponse = {
-  id: string
-  filename: string
-  uploaded_at: string
-  metadata: FileMetadata
-}
+export function FileUpload({ onFileUploaded, onError }: FileUploadProps) {
+  const [isDragging, setIsDragging] = useState(false)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [isUploading, setIsUploading] = useState(false)
 
-const apiUrl = import.meta.env.VITE_API_URL;
+  const handleDrag = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+  }, [])
 
-export default function FileUpload() {
-  const [uploading, setUploading] = useState(false)
-  const [fileData, setFileData] = useState<UploadResponse | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [charts, setCharts] = useState<any[]>([])
-
-  const handleAddChart = (suggestion: any) => {
-    // Generate unique ID for each chart
-    const chartWithId = {
-      ...suggestion,
-      id: `${suggestion.chart_type}-${Date.now()}-${Math.random()}`,
-      x_axis: suggestion.parameters.x_axis,
-      y_axis: suggestion.parameters.y_axis,
-      aggregation: suggestion.parameters.aggregation || 'none',
+  const handleDragIn = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
+      setIsDragging(true)
     }
-    setCharts((prev) => [...prev, chartWithId])
+  }, [])
+
+  const handleDragOut = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+  }, [])
+
+  const validateFile = (file: File): boolean => {
+    const validTypes = [
+      "text/csv",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "application/vnd.ms-excel",
+    ]
+    const validExtensions = [".csv", ".xlsx", ".xls"]
+    const hasValidExtension = validExtensions.some((ext) =>
+      file.name.toLowerCase().endsWith(ext)
+    )
+    return validTypes.includes(file.type) || hasValidExtension
   }
 
-  const handleRemoveChart = (chartId: string) => {
-    setCharts((prev) => prev.filter((c) => c.id !== chartId))
-  }
-
-  const onDrop = useCallback(async (acceptedFiles: File[]) => {
-    const file = acceptedFiles[0]
-    if (!file) return
-
-    setUploading(true)
-    setError(null)
-    setFileData(null)
-
+  const uploadFile = async (file: File) => {
+    setIsUploading(true)
     const formData = new FormData()
-    formData.append('file', file)
+    formData.append("file", file)
 
     try {
-      const response = await fetch(`${apiUrl}/api/upload`, {
-        method: 'POST',
+      const response = await fetch(getApiUrl(API_CONFIG.endpoints.upload), {
+        method: "POST",
         body: formData,
       })
 
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.detail || 'Error al subir archivo')
+        throw new Error("Error uploading file")
       }
 
-      const data = (await response.json()) as UploadResponse
-      setFileData(data)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error desconocido')
+      const data: UploadResponse = await response.json()
+      onFileUploaded(data)
+    } catch (error) {
+      onError(error instanceof Error ? error.message : "Error uploading file")
+      setSelectedFile(null)
     } finally {
-      setUploading(false)
+      setIsUploading(false)
     }
-  }, [])
+  }
 
-  const onDropRejected = useCallback((fileRejections: any[]) => {
-    const rejection = fileRejections[0]
-    if (!rejection) return
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      setIsDragging(false)
 
-    const { errors } = rejection
-    const errorCode = errors[0]?.code
-
-    let message = 'Error al procesar el archivo'
-    
-    if (errorCode === 'file-too-large') {
-      message = 'Archivo muy grande. Máximo 5 MB'
-    } else if (errorCode === 'file-invalid-type') {
-      message = 'Formato no permitido. Use archivos CSV o XLSX'
-    } else if (errorCode === 'too-many-files') {
-      message = 'Solo puede subir un archivo a la vez'
-    }
-
-    setError(message)
-    setFileData(null)
-  }, [])
-
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
-    onDropRejected,
-    accept: {
-      'text/csv': ['.csv'],
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
+      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        const file = e.dataTransfer.files[0]
+        if (validateFile(file)) {
+          setSelectedFile(file)
+          uploadFile(file)
+        } else {
+          onError("Formato de archivo no soportado. Usa CSV o XLSX.")
+        }
+      }
     },
-    maxFiles: 1,
-    maxSize: 5 * 1024 * 1024, // 5 MB
-  })
+    [onError]
+  )
+
+  const handleFileInput = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (e.target.files && e.target.files.length > 0) {
+        const file = e.target.files[0]
+        if (validateFile(file)) {
+          setSelectedFile(file)
+          uploadFile(file)
+        } else {
+          onError("Formato de archivo no soportado. Usa CSV o XLSX.")
+        }
+      }
+    },
+    [onError]
+  )
+
+  const removeFile = useCallback(() => {
+    setSelectedFile(null)
+  }, [])
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return bytes + " B"
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB"
+    return (bytes / (1024 * 1024)).toFixed(1) + " MB"
+  }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-950 p-6">
-      <div className="w-full max-w-4xl space-y-6">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold text-slate-100">Insight Dashboard AI</h1>
-          <p className="mt-2 text-slate-400">
-            Sube tu archivo CSV o Excel para análisis instantáneo
-          </p>
-        </div>
-
-        <div
-          {...getRootProps()}
-          className={`cursor-pointer rounded-2xl border-2 border-dashed p-12 text-center transition ${
-            isDragActive
-              ? 'border-indigo-400 bg-indigo-500/10'
-              : 'border-slate-700 bg-slate-900 hover:border-slate-600'
-          }`}
+    <div className="w-full max-w-2xl mx-auto">
+      {!selectedFile ? (
+        <label
+          htmlFor="file-upload-input"
+          className={cn(
+            "relative flex flex-col items-center justify-center gap-4 rounded-xl border-2 border-dashed p-12 transition-all duration-300 cursor-pointer group",
+            isDragging
+              ? "border-primary bg-primary/5 scale-[1.02]"
+              : "border-border hover:border-primary/50 hover:bg-secondary/50",
+            isUploading && "opacity-50 pointer-events-none"
+          )}
+          onDragEnter={handleDragIn}
+          onDragLeave={handleDragOut}
+          onDragOver={handleDrag}
+          onDrop={handleDrop}
         >
-          <input {...getInputProps()} />
-          
-          {uploading ? (
-            <div className="space-y-3">
-              <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-slate-700 border-t-indigo-500" />
-              <p className="text-slate-300">Procesando archivo...</p>
-            </div>
-          ) : isDragActive ? (
-            <p className="text-lg text-indigo-300">Suelta el archivo aquí</p>
-          ) : (
-            <div className="space-y-2">
-              <svg
-                className="mx-auto h-12 w-12 text-slate-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-                />
-              </svg>
-              <p className="text-lg text-slate-300">
-                Arrastra un archivo aquí o haz clic para seleccionar
-              </p>
-              <p className="text-sm text-slate-500">CSV o XLSX (máx. 5 MB)</p>
-            </div>
+          <div
+            className={cn(
+              "flex h-16 w-16 items-center justify-center rounded-2xl transition-all duration-300",
+              isDragging
+                ? "bg-primary/20 text-primary"
+                : "bg-secondary text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary"
+            )}
+          >
+            <Upload className="h-7 w-7" strokeWidth={1.5} />
+          </div>
+
+          <div className="flex flex-col items-center gap-2 text-center">
+            <p className="text-lg font-medium text-foreground">
+              {isDragging ? "Suelta tu archivo aqui" : isUploading ? "Subiendo..." : "Arrastra y suelta tu archivo"}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              {"o "}
+              <span className="text-primary font-medium underline underline-offset-4 decoration-primary/40">
+                busca en tu computador
+              </span>
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3 mt-2">
+            <span className="inline-flex items-center gap-1.5 rounded-md bg-secondary px-3 py-1.5 text-xs font-mono text-muted-foreground">
+              <FileSpreadsheet className="h-3.5 w-3.5" />
+              .xlsx
+            </span>
+            <span className="inline-flex items-center gap-1.5 rounded-md bg-secondary px-3 py-1.5 text-xs font-mono text-muted-foreground">
+              <FileSpreadsheet className="h-3.5 w-3.5" />
+              .csv
+            </span>
+          </div>
+
+          <input
+            id="file-upload-input"
+            type="file"
+            accept=".csv,.xlsx,.xls"
+            onChange={handleFileInput}
+            className="sr-only"
+            disabled={isUploading}
+          />
+        </label>
+      ) : (
+        <div className="flex items-center gap-4 rounded-xl border border-border bg-card p-5 animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+            <FileSpreadsheet className="h-6 w-6 text-primary" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-foreground truncate">
+              {selectedFile.name}
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {isUploading ? "Subiendo..." : formatFileSize(selectedFile.size)}
+            </p>
+          </div>
+          {!isUploading && (
+            <button
+              onClick={removeFile}
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+              aria-label="Eliminar archivo"
+            >
+              <X className="h-4 w-4" />
+            </button>
           )}
         </div>
-
-        {error && (
-          <ErrorMessage 
-            message={error} 
-            onRetry={() => {
-              setError(null);
-              setFileData(null);
-            }}
-          />
-        )}
-
-        {fileData && (
-          <div className="space-y-4 rounded-2xl border border-slate-800 bg-slate-900 p-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-slate-100">
-                {fileData.filename}
-              </h2>
-              <span className="rounded-full bg-emerald-500/20 px-3 py-1 text-sm text-emerald-300">
-                ✓ Procesado
-              </span>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="rounded-xl bg-slate-950/60 p-4">
-                <p className="text-sm text-slate-400">Filas</p>
-                <p className="text-2xl font-bold text-slate-100">
-                  {fileData.metadata.row_count.toLocaleString()}
-                </p>
-              </div>
-              <div className="rounded-xl bg-slate-950/60 p-4">
-                <p className="text-sm text-slate-400">Columnas</p>
-                <p className="text-2xl font-bold text-slate-100">
-                  {fileData.metadata.column_count}
-                </p>
-              </div>
-            </div>
-
-            <div>
-              <h3 className="mb-3 font-semibold text-slate-100">Columnas del dataset</h3>
-              <div className="space-y-2">
-                {fileData.metadata.columns.map((col) => (
-                  <div
-                    key={col.name}
-                    className="flex items-center justify-between rounded-lg bg-slate-950/60 p-3 text-sm"
-                  >
-                    <span className="font-medium text-slate-200">{col.name}</span>
-                    <div className="flex items-center gap-3">
-                      <span className="rounded bg-slate-800 px-2 py-1 text-xs text-slate-400">
-                        {col.type}
-                      </span>
-                      {col.stats && (
-                        <span className="text-xs text-slate-500">
-                          min: {col.stats.min?.toFixed(1)} | max: {col.stats.max?.toFixed(1)}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <h3 className="mb-3 font-semibold text-slate-100">Vista previa</h3>
-              <div className="overflow-x-auto rounded-lg border border-slate-800">
-                <table className="w-full text-left text-sm">
-                  <thead className="bg-slate-950/60">
-                    <tr>
-                      {fileData.metadata.columns.map((col) => (
-                        <th key={col.name} className="px-4 py-2 font-medium text-slate-300">
-                          {col.name}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {fileData.metadata.sample_data.map((row, idx) => (
-                      <tr key={idx} className="border-t border-slate-800">
-                        {fileData.metadata.columns.map((col) => (
-                          <td key={col.name} className="px-4 py-2 text-slate-400">
-                            {String(row[col.name] ?? '')}
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            <AnalysisSuggestions fileId={fileData.id} onAddChart={handleAddChart} />
-
-            {charts.length > 0 && (
-              <div className="mt-8">
-                <Dashboard fileId={fileData.id} charts={charts} onRemoveChart={handleRemoveChart} />
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+      )}
     </div>
   )
 }
