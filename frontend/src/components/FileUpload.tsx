@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react'
 import { useDropzone } from 'react-dropzone'
 import AnalysisSuggestions from './AnalysisSuggestions'
+import { Dashboard } from './Dashboard'
 
 type FileMetadata = {
   row_count: number
@@ -33,10 +34,22 @@ export default function FileUpload() {
   const [uploading, setUploading] = useState(false)
   const [fileData, setFileData] = useState<UploadResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [selectedCharts, setSelectedCharts] = useState<any[]>([])
+  const [charts, setCharts] = useState<any[]>([])
 
   const handleAddChart = (suggestion: any) => {
-    setSelectedCharts((prev) => [...prev, suggestion])
+    // Generate unique ID for each chart
+    const chartWithId = {
+      ...suggestion,
+      id: `${suggestion.chart_type}-${Date.now()}-${Math.random()}`,
+      x_axis: suggestion.parameters.x_axis,
+      y_axis: suggestion.parameters.y_axis,
+      aggregation: suggestion.parameters.aggregation || 'none',
+    }
+    setCharts((prev) => [...prev, chartWithId])
+  }
+
+  const handleRemoveChart = (chartId: string) => {
+    setCharts((prev) => prev.filter((c) => c.id !== chartId))
   }
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
@@ -238,24 +251,9 @@ export default function FileUpload() {
 
             <AnalysisSuggestions fileId={fileData.id} onAddChart={handleAddChart} />
 
-            {selectedCharts.length > 0 && (
-              <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
-                <h3 className="mb-3 font-semibold text-slate-100">
-                  Gráficos seleccionados ({selectedCharts.length})
-                </h3>
-                <div className="space-y-2">
-                  {selectedCharts.map((chart, idx) => (
-                    <div
-                      key={idx}
-                      className="flex items-center justify-between rounded-lg bg-slate-950/60 p-3 text-sm"
-                    >
-                      <span className="text-slate-200">{chart.title}</span>
-                      <span className="rounded bg-indigo-500/20 px-2 py-1 text-xs text-indigo-300">
-                        {chart.chart_type}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+            {charts.length > 0 && (
+              <div className="mt-8">
+                <Dashboard fileId={fileData.id} charts={charts} onRemoveChart={handleRemoveChart} />
               </div>
             )}
           </div>
