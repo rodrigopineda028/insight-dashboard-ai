@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react'
 import { useDropzone } from 'react-dropzone'
 import AnalysisSuggestions from './AnalysisSuggestions'
 import { Dashboard } from './Dashboard'
+import { ErrorMessage } from './ui/FeedbackComponents'
 
 type FileMetadata = {
   row_count: number
@@ -119,7 +120,7 @@ export default function FileUpload() {
     <div className="flex min-h-screen items-center justify-center bg-slate-950 p-6">
       <div className="w-full max-w-4xl space-y-6">
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-slate-100">Insight Dash AI</h1>
+          <h1 className="text-3xl font-bold text-slate-100">Insight Dashboard AI</h1>
           <p className="mt-2 text-slate-400">
             Sube tu archivo CSV o Excel para análisis instantáneo
           </p>
@@ -166,9 +167,13 @@ export default function FileUpload() {
         </div>
 
         {error && (
-          <div className="rounded-xl border border-red-500/40 bg-red-500/10 p-4 text-center text-red-200">
-            {error}
-          </div>
+          <ErrorMessage 
+            message={error} 
+            onRetry={() => {
+              setError(null);
+              setFileData(null);
+            }}
+          />
         )}
 
         {fileData && (

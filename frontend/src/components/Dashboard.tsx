@@ -3,6 +3,7 @@ import { BarChartComponent } from './charts/BarChartComponent';
 import { LineChartComponent } from './charts/LineChartComponent';
 import { PieChartComponent } from './charts/PieChartComponent';
 import { ScatterChartComponent } from './charts/ScatterChartComponent';
+import { ChartSkeleton, ErrorMessage, EmptyState } from './ui/FeedbackComponents';
 
 interface ChartConfig {
   id: string;
@@ -92,23 +93,15 @@ export function Dashboard({ fileId, charts, onRemoveChart }: DashboardProps) {
     const { config, data, loading, error } = chartData;
 
     if (loading) {
-      return (
-        <div className="bg-white rounded-lg shadow-md p-4 h-[400px] flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="mt-4 text-gray-600">Cargando datos...</p>
-          </div>
-        </div>
-      );
+      return <ChartSkeleton />;
     }
 
     if (error) {
       return (
-        <div className="bg-white rounded-lg shadow-md p-4 h-[400px] flex items-center justify-center">
-          <div className="text-center">
-            <p className="text-red-600">❌ {error}</p>
-          </div>
-        </div>
+        <ErrorMessage 
+          message={error} 
+          onRetry={() => fetchChartData(config)}
+        />
       );
     }
 
@@ -128,30 +121,27 @@ export function Dashboard({ fileId, charts, onRemoveChart }: DashboardProps) {
 
   if (charts.length === 0) {
     return (
-      <div className="text-center py-12">
-        <p className="text-gray-500 text-lg">
-          📊 No hay gráficos agregados aún.
-        </p>
-        <p className="text-gray-400 mt-2">
-          Analiza el archivo y agrega visualizaciones desde las sugerencias de AI
-        </p>
-      </div>
+      <EmptyState
+        icon="📊"
+        title="No hay gráficos en el dashboard"
+        description="Analiza el archivo con AI y agrega visualizaciones desde las sugerencias para comenzar a explorar tus datos."
+      />
     );
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <h2 className="text-2xl font-bold text-gray-800">Dashboard</h2>
         <p className="text-gray-600">{charts.length} gráfico(s)</p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
         {chartsData.map(chartData => (
           <div key={chartData.id} className="relative">
             <button
               onClick={() => onRemoveChart(chartData.id)}
-              className="absolute top-2 right-2 z-10 bg-red-500 text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-red-600 transition-colors"
+              className="absolute top-2 right-2 z-10 bg-red-500 text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-red-600 transition-colors shadow-lg"
               title="Eliminar gráfico"
             >
               ✕
@@ -163,3 +153,4 @@ export function Dashboard({ fileId, charts, onRemoveChart }: DashboardProps) {
     </div>
   );
 }
+
