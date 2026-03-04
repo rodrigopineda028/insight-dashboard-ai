@@ -10,3 +10,4 @@ backend/.venv
 
 # Env
 .env
+.DS_Store
