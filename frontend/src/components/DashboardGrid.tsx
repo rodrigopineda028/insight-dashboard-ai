@@ -36,6 +36,15 @@ const COLORS = [
   "hsl(var(--chart-5))",
 ]
 
+// Helper to format dates (remove time portion from ISO strings)
+const formatDateValue = (value: unknown): string => {
+  if (typeof value === 'string' && value.includes('T')) {
+    // If it's an ISO date string, extract just the date part
+    return value.split('T')[0]
+  }
+  return String(value)
+}
+
 interface CustomTooltipProps {
   active?: boolean
   payload?: Array<{ value: number; name: string; dataKey: string }>
@@ -46,7 +55,7 @@ function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
   if (!active || !payload?.length) return null
   return (
     <div className="rounded-lg border border-border bg-card px-3 py-2 shadow-lg">
-      <p className="text-xs font-medium text-foreground mb-1">{label}</p>
+      <p className="text-xs font-medium text-foreground mb-1">{formatDateValue(label)}</p>
       {payload.map((entry, i) => (
         <p key={i} className="text-xs text-muted-foreground">
           {entry.name}: <span className="font-mono text-foreground">{entry.value.toLocaleString()}</span>
@@ -133,6 +142,7 @@ function ChartRenderer({ suggestion, fileId }: ChartRendererProps) {
               className="text-muted-foreground"
               axisLine={false}
               tickLine={false}
+              tickFormatter={formatDateValue}
             />
             <YAxis
               tick={{ fontSize: 11 }}
@@ -160,6 +170,7 @@ function ChartRenderer({ suggestion, fileId }: ChartRendererProps) {
               className="text-muted-foreground"
               axisLine={false}
               tickLine={false}
+              tickFormatter={formatDateValue}
             />
             <YAxis
               tick={{ fontSize: 11 }}
@@ -193,8 +204,8 @@ function ChartRenderer({ suggestion, fileId }: ChartRendererProps) {
             />
             <Pie
               data={data}
-              dataKey={yKey}
-              nameKey={xKey}
+              dataKey="value"
+              nameKey="name"
               cx="50%"
               cy="45%"
               outerRadius="70%"

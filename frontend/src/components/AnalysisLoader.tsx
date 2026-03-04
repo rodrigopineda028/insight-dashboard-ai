@@ -3,9 +3,9 @@ import { Brain, Table, BarChart3, Sparkles } from "lucide-react"
 
 const steps = [
   { icon: Table, label: "Leyendo estructura de datos...", delay: 0 },
-  { icon: Brain, label: "IA analizando patrones...", delay: 2500 },
-  { icon: BarChart3, label: "Generando sugerencias...", delay: 3000 },
-  { icon: Sparkles, label: "Finalizando análisis...", delay: 4500 },
+  { icon: Brain, label: "IA analizando patrones...", delay: 2000 },
+  { icon: BarChart3, label: "Generando sugerencias...", delay: 4500 },
+  { icon: Sparkles, label: "Finalizando análisis...", delay: 7000 },
 ]
 
 interface AnalysisLoaderProps {
@@ -16,7 +16,6 @@ export function AnalysisLoader({ isComplete = false }: AnalysisLoaderProps) {
   const [currentStep, setCurrentStep] = useState(0)
   const [progress, setProgress] = useState(0)
 
-  // Step timers - solo se ejecutan una vez al montar
   useEffect(() => {
     const stepTimers = steps.map((_, index) =>
       setTimeout(() => {
@@ -27,9 +26,8 @@ export function AnalysisLoader({ isComplete = false }: AnalysisLoaderProps) {
     return () => {
       stepTimers.forEach(clearTimeout)
     }
-  }, []) // Sin dependencias - solo se ejecuta al montar
+  }, [])
 
-  // Progress bar - separado para manejar isComplete
   useEffect(() => {
     const progressInterval = setInterval(() => {
       setProgress((prev) => {

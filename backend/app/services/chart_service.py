@@ -43,11 +43,19 @@ class ChartService:
             return result.to_dict(orient="records")
     
     @staticmethod
-    def process_pie_chart(df: pd.DataFrame, column: str) -> List[Dict[str, Any]]:
+    def process_pie_chart(df: pd.DataFrame, column: str, value_column: str | None = None) -> List[Dict[str, Any]]:
         """Process data for pie chart (top N categories)."""
-        counts = df[column].value_counts().head(settings.PIE_CHART_MAX_CATEGORIES)
-        result = counts.reset_index()
-        result.columns = ["name", "value"]
+        if value_column:
+            # Aggregate values by category (e.g., sum of sales per region)
+            grouped = df.groupby(column)[value_column].sum()
+            result = grouped.nlargest(settings.PIE_CHART_MAX_CATEGORIES).reset_index()
+            result.columns = ["name", "value"]
+        else:
+            # Just count occurrences
+            counts = df[column].value_counts().head(settings.PIE_CHART_MAX_CATEGORIES)
+            result = counts.reset_index()
+            result.columns = ["name", "value"]
+        
         return result.to_dict(orient="records")
     
     @staticmethod
@@ -106,7 +114,7 @@ class ChartService:
             ValueError: If chart type is invalid or required parameters missing
         """
         if chart_type == "pie":
-            return self.process_pie_chart(df, x_axis)
+            return self.process_pie_chart(df, x_axis, y_axis)
         elif chart_type == "bar":
             if not y_axis:
                 raise ValueError("Bar chart requires y_axis")

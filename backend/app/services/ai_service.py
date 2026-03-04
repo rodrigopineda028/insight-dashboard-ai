@@ -71,8 +71,10 @@ Propón EXACTAMENTE entre 3 y 5 visualizaciones que revelen patrones valiosos: t
 3. Si NO hay columna de fecha/tiempo, NO uses line chart
 4. Si hay muchas categorías únicas (>20), NO uses pie chart
 5. Para bar/line: x_axis debe ser categórica o temporal, y_axis numérica
-6. Para scatter: ambos ejes deben ser numéricos
+6. Para scatter: ambos ejes deben ser numéricos Y DIFERENTES (si solo hay 1 columna numérica, usa line chart en vez de scatter)
 7. Para pie: usa solo columna categórica con pocas categorías (<10)
+8. NUNCA uses la misma columna para x_axis y y_axis
+9. Si tienes fecha + valor numérico, prefiere line chart sobre scatter
 
 **Responde ÚNICAMENTE con un array JSON válido, SIN texto adicional antes o después:**
 [
@@ -153,7 +155,10 @@ Recuerda: Devuelve SOLO el JSON, sin explicaciones adicionales."""
                         raise ValueError(f"Columna inválida en x_axis: {params['x_axis']}")
                     if "y_axis" in params and params["y_axis"] not in available_columns:
                         raise ValueError(f"Columna inválida en y_axis: {params['y_axis']}")
-                
+                    # Validate x_axis != y_axis for charts that use both
+                    if "x_axis" in params and "y_axis" in params and params["x_axis"] == params["y_axis"]:
+                        raise ValueError(f"x_axis y y_axis no pueden ser la misma columna: {params['x_axis']}")
+
                 return suggestions
                 
             except (json.JSONDecodeError, ValidationError, ValueError) as e:
