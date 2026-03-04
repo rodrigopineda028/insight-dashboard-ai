@@ -5,6 +5,8 @@ import { PieChartComponent } from './charts/PieChartComponent';
 import { ScatterChartComponent } from './charts/ScatterChartComponent';
 import { ChartSkeleton, ErrorMessage, EmptyState } from './ui/FeedbackComponents';
 
+const apiUrl = import.meta.env.VITE_API_URL;
+
 interface ChartConfig {
   id: string;
   title: string;
@@ -51,7 +53,7 @@ export function Dashboard({ fileId, charts, onRemoveChart }: DashboardProps) {
 
   const fetchChartData = async (chart: ChartConfig) => {
     try {
-      const response = await fetch('http://localhost:8000/api/chart-data', {
+      const response = await fetch(`${apiUrl}/api/chart-data`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
