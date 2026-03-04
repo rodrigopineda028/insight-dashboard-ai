@@ -1,0 +1,14 @@
+# Coverage reports
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+
+# Test cache
+.pytest_cache/
+__pycache__/
+*.pyc
+
+venv/
+.venv/
