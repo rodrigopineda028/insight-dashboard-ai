@@ -2,19 +2,15 @@
 import io
 import uuid
 from datetime import datetime
-from typing import Dict
 
 import pandas as pd
 from fastapi import APIRouter, File, HTTPException, UploadFile
 
+from app.config.settings import settings
+from app.models.responses import ColumnInfo, ColumnStats, FileMetadata, UploadResponse
+from app.services.storage import file_storage
+
 router = APIRouter()
-
-# In-memory storage for uploaded files (use Redis/DB in production)
-file_storage: Dict[str, dict] = {}
-
-# Configuration
-MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 MB
-ALLOWED_EXTENSIONS = {".csv", ".xlsx"}
 
 
 def get_file_extension(filename: str) -> str:
@@ -26,14 +22,14 @@ def validate_file(file: UploadFile) -> None:
     """Validate uploaded file format and size."""
     ext = get_file_extension(file.filename or "")
     
-    if ext not in ALLOWED_EXTENSIONS:
+    if ext not in settings.ALLOWED_EXTENSIONS:
         raise HTTPException(
             status_code=400,
-            detail=f"Formato no permitido. Use: {', '.join(ALLOWED_EXTENSIONS)}",
+            detail=f"Formato no permitido. Use: {', '.join(settings.ALLOWED_EXTENSIONS)}",
         )
 
 
-def process_dataframe(df: pd.DataFrame) -> dict:
+def process_dataframe(df: pd.DataFrame) -> FileMetadata:
     """Extract metadata and statistics from DataFrame."""
     columns_info = []
     total = len(df)
@@ -43,35 +39,40 @@ def process_dataframe(df: pd.DataFrame) -> dict:
         non_null = int(df[col].count())
         null_count = total - non_null
         
-        col_info = {
-            "name": col,
-            "type": dtype,
-            "non_null_count": non_null,
-            "null_count": null_count,
-            "missingness_pct": round((null_count / total * 100), 2) if total > 0 else 0,
-            "cardinality": int(df[col].nunique()),
-        }
-        
+        stats = None
         # Add statistics for numeric columns
         if pd.api.types.is_numeric_dtype(df[col]):
-            col_info["stats"] = {
-                "min": float(df[col].min()) if not df[col].isna().all() else None,
-                "max": float(df[col].max()) if not df[col].isna().all() else None,
-                "mean": float(df[col].mean()) if not df[col].isna().all() else None,
-                "median": float(df[col].median()) if not df[col].isna().all() else None,
-            }
+            stats = ColumnStats(
+                min=float(df[col].min()) if not df[col].isna().all() else None,
+                max=float(df[col].max()) if not df[col].isna().all() else None,
+                mean=float(df[col].mean()) if not df[col].isna().all() else None,
+                median=float(df[col].median()) if not df[col].isna().all() else None,
+                std=float(df[col].std()) if not df[col].isna().all() else None,
+                q25=float(df[col].quantile(0.25)) if not df[col].isna().all() else None,
+                q75=float(df[col].quantile(0.75)) if not df[col].isna().all() else None,
+            )
+        
+        col_info = ColumnInfo(
+            name=col,
+            type=dtype,
+            non_null_count=non_null,
+            null_count=null_count,
+            missingness_pct=round((null_count / total * 100), 2) if total > 0 else 0,
+            cardinality=int(df[col].nunique()),
+            stats=stats
+        )
         
         columns_info.append(col_info)
     
-    return {
-        "row_count": len(df),
-        "column_count": len(df.columns),
-        "columns": columns_info,
-        "sample_data": df.head(10).to_dict(orient="records"),
-    }
+    return FileMetadata(
+        row_count=len(df),
+        column_count=len(df.columns),
+        columns=columns_info,
+        sample_data=df.head(10).to_dict(orient="records"),
+    )
 
 
-@router.post("/upload")
+@router.post("/upload", response_model=UploadResponse)
 async def upload_file(file: UploadFile = File(...)):
     """
     Upload CSV or Excel file and process it.
@@ -84,10 +85,10 @@ async def upload_file(file: UploadFile = File(...)):
     content = await file.read()
     
     # Check file size
-    if len(content) > MAX_FILE_SIZE:
+    if len(content) > settings.MAX_FILE_SIZE:
         raise HTTPException(
             status_code=400,
-            detail=f"Archivo muy grande. Máximo {MAX_FILE_SIZE // (1024*1024)} MB",
+            detail=f"Archivo muy grande. Máximo {settings.MAX_FILE_SIZE // (1024*1024)} MB",
         )
     
     # Parse file based on extension
@@ -111,35 +112,20 @@ async def upload_file(file: UploadFile = File(...)):
     
     # Process DataFrame
     metadata = process_dataframe(df)
+    uploaded_at = datetime.utcnow().isoformat()
     
-    # Store in memory (including the DataFrame for later use)
-    file_storage[file_id] = {
-        "id": file_id,
-        "filename": file.filename,
-        "uploaded_at": datetime.utcnow().isoformat(),
-        "metadata": metadata,
-        "dataframe": df,
-    }
+    # Store in file storage service
+    file_storage.save(
+        file_id=file_id,
+        filename=file.filename or "unknown",
+        uploaded_at=uploaded_at,
+        metadata=metadata.model_dump(),
+        dataframe=df
+    )
     
-    # Return metadata (without the raw DataFrame)
-    return {
-        "id": file_id,
-        "filename": file.filename,
-        "uploaded_at": file_storage[file_id]["uploaded_at"],
-        "metadata": metadata,
-    }
-
-
-@router.get("/files/{file_id}/summary")
-async def get_file_summary(file_id: str):
-    """Get summary of previously uploaded file."""
-    if file_id not in file_storage:
-        raise HTTPException(status_code=404, detail="Archivo no encontrado")
-    
-    stored = file_storage[file_id]
-    return {
-        "id": stored["id"],
-        "filename": stored["filename"],
-        "uploaded_at": stored["uploaded_at"],
-        "metadata": stored["metadata"],
-    }
+    return UploadResponse(
+        id=file_id,
+        filename=file.filename or "unknown",
+        uploaded_at=uploaded_at,
+        metadata=metadata
+    )
