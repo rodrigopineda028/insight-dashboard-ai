@@ -1,5 +1,7 @@
-import { X, Maximize2, Minimize2 } from "lucide-react"
-import { useState, useEffect } from "react"
+import { X, Maximize2, Minimize2, Download, FileImage } from "lucide-react"
+import { useState, useEffect, useRef } from "react"
+import { exportAsPNG, exportAsPDF } from "@/lib/export"
+import { Button } from "@/components/ui/button"
 import {
   BarChart,
   Bar,
@@ -251,6 +253,32 @@ function ChartRenderer({ suggestion, fileId }: ChartRendererProps) {
 
 export function DashboardGrid({ suggestions, fileId, onRemove }: DashboardGridProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [exporting, setExporting] = useState(false)
+  const chartsGridRef = useRef<HTMLDivElement>(null)
+
+  const handleExportPNG = async () => {
+    if (!chartsGridRef.current) return
+    setExporting(true)
+    try {
+      await exportAsPNG(chartsGridRef.current, `dashboard-${Date.now()}.png`)
+    } catch (error) {
+      console.error("Export failed:", error)
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  const handleExportPDF = async () => {
+    if (!chartsGridRef.current) return
+    setExporting(true)
+    try {
+      await exportAsPDF(chartsGridRef.current, `dashboard-${Date.now()}.pdf`)
+    } catch (error) {
+      console.error("Export failed:", error)
+    } finally {
+      setExporting(false)
+    }
+  }
 
   if (suggestions.length === 0) {
     return null
@@ -265,9 +293,33 @@ export function DashboardGrid({ suggestions, fileId, onRemove }: DashboardGridPr
             {suggestions.length} {suggestions.length === 1 ? "visualizacion" : "visualizaciones"} activas
           </p>
         </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportPNG}
+            disabled={exporting}
+            className="gap-2"
+          >
+            <FileImage className="h-4 w-4" />
+            PNG
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportPDF}
+            disabled={exporting}
+            className="gap-2"
+          >
+            <Download className="h-4 w-4" />
+            PDF
+          </Button>
+        </div>
       </div>
 
-      <div className={cn(
+      <div 
+        ref={chartsGridRef}
+        className={cn(
         "grid gap-4",
         expandedId
           ? "grid-cols-1"
